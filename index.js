@@ -16,11 +16,45 @@ dotenv.config();
 
 // Middleware
 app.use(express.json());
-app.use("/images", express.static(path.join(__dirname, "/images")));
+app.use("/images", express.static(path.join(__dirname, "images")));
 app.use(cookieParser());
 
 // CORS configuration
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+// Database connection
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("Database connected successfully!");
+
+    // Start the server after the database connection is established
+    const server = app.listen(process.env.PORT, () => {
+      console.log(`App is running on port ${process.env.PORT}`);
+    });
+
+    // Handle server shutdown gracefully
+    process.on("SIGINT", () => {
+      console.log("Received SIGINT. Closing server and database connection.");
+      server.close(() => {
+        mongoose.connection.close(false, () => {
+          console.log("Server and database connection closed.");
+          process.exit(0);
+        });
+      });
+    });
+  } catch (err) {
+    console.error(err);
+  }
+};
 
 // Routes
 app.use("/api/auth", authRoute);
@@ -42,21 +76,6 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   console.log(req.body);
   res.status(200).json("Image has been uploaded successfully!");
 });
-
-// Database connection
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log("Database connected successfully!");
-    
-    // Start the server after the database connection is established
-    app.listen(process.env.PORT, () => {
-      console.log("App is running on port " + process.env.PORT);
-    });
-  } catch (err) {
-    console.error(err);
-  }
-};
 
 // Static files
 app.use(express.static(path.join(__dirname, "./frontend/dist")));
